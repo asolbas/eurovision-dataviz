@@ -14,5 +14,5 @@ Github repository to generate a dashboard of Eurovision in Streamlit.
 The data for the dashboard has been obtained from public repositories: 
 
 - [eurovision-dataset GitHub repository](https://pages.github.com/](https://github.com/Spijkervet/eurovision-dataset)
-- [ESC Kaggle dataset](https://pages.github.com/](https://github.com/Spijkervet/eurovision-dataset](https://www.kaggle.com/datasets/diamondsnake/eurovision-song-contest-data?ref=thedataschool.co.uk)
-- [mirovision GitHub repository](https://pages.github.com/]([https://github.com/Spijkervet/eurovision-dataset](https://www.kaggle.com/datasets/diamondsnake/eurovision-song-contest-data?ref=thedataschool.co.uk))](https://github.com/Amsterdam-Music-Lab/mirovision?tab=readme-ov-file)
+- [ESC Kaggle dataset](https://pages.github.com/](https://www.kaggle.com/datasets/diamondsnake/eurovision-song-contest-data?ref=thedataschool.co.uk)
+- [mirovision GitHub repository](https://github.com/Amsterdam-Music-Lab/mirovision?tab=readme-ov-file)
