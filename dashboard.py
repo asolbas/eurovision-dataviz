@@ -2,14 +2,19 @@ import streamlit as st
 from streamlit_option_menu import option_menu
 
 import os
+import math
 import numpy as np
 import pandas as pd
 import geopandas as gpd
 from shapely.ops import nearest_points
 import seaborn as sns
 import matplotlib.pyplot as plt
+import plotly.express as px
 import altair as alt
 import re
+import json
+import networkx as nx
+import nx_altair as nxa
 
 #PAGE LAYOUT
 st.set_page_config(layout="wide")
@@ -55,6 +60,13 @@ with st.sidebar:
 
     #Votes ------------------------
     country_votes_df = pd.read_csv('./Data/votes.csv')
+    # Import country-geographical group mapping
+    with open('./Data/country_groups_mapping.json', 'r') as file:
+        country_group_mapping = json.load(file)
+
+    # Add geographical group 
+    country_votes_df['from_country_group'] = country_votes_df['from_country'].replace(country_group_mapping)
+    country_votes_df['to_country_group'] = country_votes_df['to_country'].replace(country_group_mapping)
 
     #Calculate pertentage of points given and received
     country_votes_filter_df = country_votes_df[country_votes_df['round']=='final'][['year', 'from_country', 'to_country', 'total_points']].dropna()
@@ -72,14 +84,32 @@ with st.sidebar:
     country_votes_filter_df = country_votes_filter_df.merge(country_total_points)
     country_votes_filter_df['norm_points_from'] = country_votes_filter_df['total_points'] / country_votes_filter_df['overall_points_from']
     country_votes_filter_df['pct_points_from'] = country_votes_filter_df['norm_points_from'] * 100
-    country_votes_filter_df.sort_values('pct_points_from').tail()
     #Calculate percentage points a country has receiven by others trough its history
     country_total_points = country_votes_filter_df.groupby('to_country',as_index=False)['total_points'].sum()
     country_total_points.columns = ['to_country', 'overall_points_to']
     country_votes_filter_df = country_votes_filter_df.merge(country_total_points)
     country_votes_filter_df['norm_points_to'] = country_votes_filter_df['total_points'] / country_votes_filter_df['overall_points_to']
     country_votes_filter_df['pct_points_to'] = country_votes_filter_df['norm_points_to'] * 100
-    country_votes_filter_df.sort_values('pct_points_to').tail()
+
+    #Songs ----------------------
+    songs_df = pd.read_csv('./Data/song_data.csv', na_values=['-', 'unknown'])
+    songs_df = songs_df[songs_df['year']!=2020]
+
+    #Create a classification column to group songs according to their position
+    def classification_group(final_position):
+        if final_position == 1:
+            classification = 'Winner'
+        elif final_position <= 5: 
+            classification = 'Top5'
+        elif final_position <= 10: 
+            classification = 'Top10'
+        elif math.isnan(final_position) or final_position == '_':
+            classification = 'Semifinalist'
+        else:
+            classification = 'Finalist'
+        return classification 
+
+    songs_df['classification'] = songs_df['final_draw_position'].apply(classification_group)
 
 #EUROVISION IN A NUTSHELL-----------------------
 if selected == 'Overview':
@@ -179,7 +209,7 @@ if selected == 'Overview':
                     width=600,
                     height=300
             )
-    col1.subheader('Evolution of the songs')
+    col1.subheader('Evolution of the songs languages')
     col1.altair_chart(languages_plot, use_container_width=True, theme=None)
 
 
@@ -377,3 +407,139 @@ if selected == 'Geopolitics':
     col1.subheader('Who is the most popular?')
     col1.altair_chart(popularity_plot, use_container_width=True, theme=None)
 
+    #Friendzone plot ----------------------------
+    col2.subheader('Friendzone graph')
+
+    #Percentage threshold 
+    #Add an interactive bar to select percentage threshold
+    th = col2.select_slider('**Select a percentage threshold**', 
+                               options = np.arange(0,20.5,0.5),
+                               value=6)
+    votes_graph = nx.from_pandas_edgelist(country_votes_filter_df[country_votes_filter_df['pct_points_from']>th],
+                                        'from_country', 'to_country',
+                                        edge_attr=['pct_points_from','total_points'])
+
+    #Create a dictionary mapping each country to its country_id
+    country_name_mapping = dict(zip(country_votes_filter_df['from_country'], country_votes_filter_df['from_country_name']))
+    country_id_mapping = dict(zip(country_votes_filter_df['from_country'], country_votes_filter_df['from_country']))
+
+    # Add country_id and name as node attributes
+    nx.set_node_attributes(votes_graph, country_name_mapping, 'country_name')
+    nx.set_node_attributes(votes_graph, country_id_mapping, 'country_id')
+    nx.set_node_attributes(votes_graph, country_id_mapping, 'label')
+    nx.set_node_attributes(votes_graph, country_group_mapping, 'country_group')
+
+    # Compute positions for viz.
+    pos = nx.spring_layout(votes_graph, seed=1999)
+
+    #Get edges weights 
+    weights = list(nx.get_edge_attributes(votes_graph,'pct_points_from').values())
+
+    # Draw the graph using Altair
+    geo_graph = nxa.draw_networkx(
+            votes_graph, pos=pos,
+            width='pct_points_from',
+            node_color = 'country_group',
+            edge_tooltip=['pct_points_from', 'total_points'],
+            node_tooltip=['country_name'],
+            edge_color='#E6E6FA',
+        ).properties(
+            width=600,
+            height=400
+        ).configure_view(
+            stroke=None  # Remove the stroke
+        ).configure_axis(
+            domain=False  # Remove all axes
+        ).interactive()
+    
+    col2.altair_chart(geo_graph, use_container_width=True, theme=None)
+
+    #Neighbors voting plot ------------------------
+    st.subheader('Do neighbors vote each other?')
+
+    def distance_btw_countries(country_a, country_b):
+        """Calculate shortest distance beween two countries"""
+        if (country_a in gdf_ne["country"].values) and (country_b in gdf_ne["country"].values):
+            #Get country geometry
+            country_a_geom = gdf_ne[gdf_ne["country"] == country_a]["geometry"].iloc[0]
+            country_b_geom = gdf_ne[gdf_ne["country"] == country_b]["geometry"].iloc[0]
+            #Find nearest points between borders 
+            dot_a, dot_b = nearest_points(country_a_geom, country_b_geom)
+            #Calculate distance between points
+            distance = dot_a.distance(dot_b)
+        else:
+            distance = np.nan
+        return distance
+
+    #Calculate distance between countries
+    url = "./Data/world.geo.json"
+    gdf_ne = gpd.read_file(url)  # zipped shapefile
+    gdf_ne = gdf_ne[["name", 'geometry', 'continent', 'type']]
+    gdf_ne.columns = ["country", 'geometry', 'continent', 'type']
+    country_votes_dist_df = country_votes_filter_df[country_votes_filter_df['from_country'] != country_votes_filter_df['to_country']]
+    country_votes_dist_df.loc[:,'distance'] = country_votes_dist_df.apply(lambda row: distance_btw_countries(row['from_country_name'], row['to_country_name']), axis=1)
+    country_votes_dist_df = country_votes_dist_df.dropna(subset=['distance'])
+    #Filter Australia
+    country_votes_dist_df = country_votes_dist_df[country_votes_dist_df['from_country_name']!='Australia']
+    country_votes_dist_df = country_votes_dist_df[country_votes_dist_df['to_country_name']!='Australia']
+    #Scatter plot
+    distance_plot = alt.Chart(country_votes_dist_df).mark_circle(size=60).encode(
+            x=alt.X('distance:Q').title('Distance (degrees)'),
+            y=alt.Y('pct_points_from:Q').title('Percentage of points given'),
+            tooltip=['from_country_name', 'to_country_name', 'pct_points_from', 'distance']
+        ).properties(
+                width=800,
+                height=400
+        )
+
+    reg_line = distance_plot.transform_regression('distance', 'pct_points_from').mark_line(color='red')
+
+    st.altair_chart(distance_plot + reg_line,  theme=None)
+
+#WHAT MAKES A SONG SO GOOD-----------------------
+if selected == 'Music':
+    st.title('What makes a song SO good?')
+
+    group_selection = st.selectbox("Select classification group", 
+                                   options=['All', 'Winner', 'Top5', 'Top10', 
+                                            'Finalist', 'Semifinalist'])
+
+    col1, col2 = st.columns(2)
+
+    #Features radar plot ----------------------
+    col1.header('Mean song features values')
+
+    if group_selection == 'Winner':
+        features_df = songs_df[songs_df['classification']=='Winner']
+    elif group_selection == 'Top5':
+        features_df = songs_df[songs_df['classification'].isin(['Winner', 'Top5'])]
+    elif group_selection == 'Top10':
+        features_df = songs_df[songs_df['classification'].isin(['Winner', 'Top5', 'Top10'])]
+    elif group_selection == 'Finalist':
+        features_df = songs_df[songs_df['classification'].isin(['Winner', 'Top5', 'Top10', 'Finalist'])]
+    elif group_selection == 'Semifinalist':
+        features_df = songs_df[songs_df['classification'].isin(['Semifinalist'])]
+    else:
+        features_df = songs_df
+    #Calculate the medium for each characteristic
+    features_df = features_df[['energy', 'danceability', 'happiness', 'acousticness', 
+                            'liveness', 'speechiness']].melt(
+                                var_name='Feature', value_name='Value')
+    features_df = features_df.groupby('Feature',as_index=False)['Value'].mean()
+
+    #Plot mean values
+    fig = px.line_polar(features_df, r='Value', theta='Feature', line_close=True,
+                    template = 'plotly_dark')
+    fig.update_traces(fill='toself')
+    fig.update_layout(
+    polar=dict(
+        radialaxis=dict(
+        visible=True,
+        range=[0, 80]
+        )),
+    showlegend=False,
+    width=600,
+    height=400
+    )
+
+    col1.plotly_chart(fig, use_container_width=True, theme=None)
