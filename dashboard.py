@@ -428,6 +428,7 @@ if selected == 'Geopolitics':
     ).transform_filter(
         alt.datum.rank <= 5).properties(
             width=150,
+            height=150,
             title="Most votes to"
         )
     )
