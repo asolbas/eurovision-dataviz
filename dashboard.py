@@ -321,7 +321,7 @@ if selected == 'Overview':
     trajectory_plot = (alt.layer(choropleth,choropleth_australia) & points_plot).add_params(click_state)
 
     col2.subheader('Trajectory of each country')
-    col2.altair_chart(trajectory_plot, use_container_width=True, theme=None)
+    col2.altair_chart(trajectory_plot, use_container_width=False, theme=None)
 
 #GEOPOLITICS IN EUROVISION -----------------------
 if selected == 'Geopolitics':
@@ -436,7 +436,7 @@ if selected == 'Geopolitics':
                     ).add_params(click_state)
     
     col1.subheader('Who is the most popular?')
-    col1.altair_chart(popularity_plot, use_container_width=True, theme=None)
+    col1.altair_chart(popularity_plot, use_container_width=False, theme=None)
 
     #Friendzone plot ----------------------------
     col2.subheader('Friendzone graph')
