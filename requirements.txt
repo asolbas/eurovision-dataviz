@@ -2,7 +2,6 @@ altair==5.2.0
 geopandas==0.14.3
 ipython==8.2.0
 ipywidgets==7.6.5
-lxml==4.8.0
 matplotlib==3.5.1
 matplotlib-inline==0.1.2
 networkx==2.7.1
