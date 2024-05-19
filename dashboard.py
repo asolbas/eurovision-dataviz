@@ -661,7 +661,7 @@ if selected == 'Music':
         return random_color
 
     cloudtext=full_cleaning(contestants_filt_df[['lyrics']],col='lyrics')
-    wordcloud = WordCloud(max_font_size=50, max_words=maximum, background_color="black",collocations=False, 
+    wordcloud = WordCloud(max_font_size=50, max_words=maximum, background_color="b",collocations=False, 
         font_path='calibri.ttf').generate(cloudtext)
     #wordcloud.generate_from_frequencies
     plt.style.use("seaborn-white")
@@ -798,10 +798,10 @@ if selected == 'Voting':
                 var_name='voting_type', value_name='points')
     #Distribution of points according to the running order 
     boxplot_running_order = alt.Chart(points_half).mark_boxplot(ticks={'color':'white'}, size=50, color='white').encode(
-            x=alt.X("final_half:O", title=None, axis=alt.Axis(labels=False, ticks=False), scale=alt.Scale(padding=1)), 
+            x=alt.X("voting_type:O", title=None, axis=alt.Axis(labels=False, ticks=False), scale=alt.Scale(padding=1)), 
             y=alt.Y("points:Q").title('Points'), 
-            color=alt.Color("final_half:N", scale=alt.Scale(range=eurovision_palette)).title('Final half'),
-            column=alt.Column('voting_type:N', header=alt.Header(orient='bottom')).title('Voting type')
+            color=alt.Color("voting_type:N", scale=alt.Scale(range=eurovision_palette)).title('Voting type'),
+            column=alt.Column('final_half:N', header=alt.Header(orient='bottom')).title('Final half')
         ).properties(
             width=250, 
             height=300, 
