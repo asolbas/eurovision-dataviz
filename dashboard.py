@@ -655,14 +655,18 @@ if selected == 'Music':
         cleantext=lemmatize(cleantext) 
         cleantext = clean_sent(cleantext)
         return cleantext
+    
+    def color_wordcloud(word, font_size, position,orientation,random_state=None, **kwargs):
+        random_color = np.random.choice(eurovision_palette[:-4])
+        return random_color
 
     cloudtext=full_cleaning(contestants_filt_df[['lyrics']],col='lyrics')
-    wordcloud = WordCloud(max_font_size=50, max_words=maximum, background_color="white",collocations=False, 
+    wordcloud = WordCloud(max_font_size=50, max_words=maximum, background_color="black",collocations=False, 
         font_path='calibri.ttf').generate(cloudtext)
     #wordcloud.generate_from_frequencies
     plt.style.use("seaborn-white")
     fig, ax = plt.subplots()
-    ax.imshow(wordcloud, interpolation="bilinear")
+    ax.imshow(wordcloud.recolor(color_func=color_wordcloud), interpolation="bilinear")
     ax.axis("off")
 
     col2.pyplot(fig, use_container_width=True)
