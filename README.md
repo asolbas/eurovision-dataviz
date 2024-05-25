@@ -1,6 +1,6 @@
 # eurovision-dataviz
 
-Github repository to generate a dashboard of Eurovision in Streamlit.
+Github repository to generate a [dashboard]([https://github.com/Spijkervet/eurovision-datase](https://eurovision-dashboard.streamlit.app/) of Eurovision in Streamlit.
 
 ## How to run the dashboard on a local computer
 
