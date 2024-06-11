@@ -28,7 +28,7 @@ nltk.download('punkt')
 nltk.download('stopwords')
 nltk.download('words')
 nltk.download('wordnet')
-nltk.download('omw-1.4')
+#nltk.download('omw-1.4')
 from nltk.tokenize import word_tokenize
 
 #PAGE LAYOUT
@@ -662,8 +662,9 @@ if selected == 'Music':
         return random_color
 
     cloudtext=full_cleaning(contestants_filt_df[['lyrics']],col='lyrics')
-    wordcloud = WordCloud(max_font_size=50, max_words=maximum, background_color="b",collocations=False, 
-        font_path='calibri.ttf').generate(cloudtext)
+    wordcloud = WordCloud(max_font_size=50, max_words=maximum, background_color="black",collocations=False, 
+        #font_path='calibri.ttf'
+        ).generate(cloudtext)
     #wordcloud.generate_from_frequencies
     plt.style.use("seaborn-white")
     fig, ax = plt.subplots()
