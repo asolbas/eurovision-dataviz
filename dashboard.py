@@ -506,13 +506,16 @@ if selected == 'Geopolitics':
         return distance
 
     #Calculate distance between countries
-    url = "./Data/world.geo.json"
+    url = "https://raw.githubusercontent.com/asolbas/eurovision-dataviz/main/Data/world.geojson"
     gdf_ne = gpd.read_file(url)  # zipped shapefile
     gdf_ne = gdf_ne[["name", 'geometry', 'continent', 'type']]
     gdf_ne.columns = ["country", 'geometry', 'continent', 'type']
     country_votes_dist_df = country_votes_filter_df[country_votes_filter_df['from_country'] != country_votes_filter_df['to_country']]
     country_votes_dist_df.loc[:,'distance'] = country_votes_dist_df.apply(lambda row: distance_btw_countries(row['from_country_name'], row['to_country_name']), axis=1)
     country_votes_dist_df = country_votes_dist_df.dropna(subset=['distance'])
+    #url = "https://raw.githubusercontent.com/asolbas/eurovision-dataviz/main/Data/country_distances.csv"
+    #country_votes_dist_df = pd.read_csv(url)
+
     #Filter Australia
     country_votes_dist_df = country_votes_dist_df[country_votes_dist_df['from_country_name']!='Australia']
     country_votes_dist_df = country_votes_dist_df[country_votes_dist_df['to_country_name']!='Australia']
