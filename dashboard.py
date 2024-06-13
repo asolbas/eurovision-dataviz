@@ -126,6 +126,17 @@ with st.sidebar:
     country_votes_filter_df['norm_points_to'] = country_votes_filter_df['total_points'] / country_votes_filter_df['overall_points_to']
     country_votes_filter_df['pct_points_to'] = country_votes_filter_df['norm_points_to'] * 100
 
+    #Total number of points received/given historically (metadata)
+    country_votes_filter_df[['from_country_name', 'to_country_name', 'overall_points_from', 'overall_points_to']]
+    from_metadata = country_votes_filter_df[['from_country_name', 'overall_points_from']].drop_duplicates()
+    to_metadata = country_votes_filter_df[['to_country_name', 'overall_points_to']].drop_duplicates()
+    country_points_metadata = from_metadata.merge(to_metadata, how='left', 
+        left_on='from_country_name', right_on='to_country_name').drop('to_country_name', axis=1)
+    country_points_metadata.fillna(0, inplace=True) 
+    country_points_metadata.columns = ['country','Total points given', 'Total points received']
+    country_points_metadata[['Total points given', 'Total points received']] = country_points_metadata[
+        ['Total points given', 'Total points received']].astype('int')
+
     #Songs ----------------------
     songs_df = pd.read_csv('./Data/song_data.csv', na_values=['-', 'unknown'])
     songs_df = songs_df[songs_df['year']!=2020]
@@ -340,7 +351,7 @@ if selected == 'Geopolitics':
     wins_country = contestants_df[contestants_df['place_contest']==1.0].groupby(['country'], as_index=False)['country'].value_counts()
     wins_country.columns = ['country',  'n_wins']
     wins_country = wins_country.merge(contestants_df['country'], on='country', how='right').fillna(0).drop_duplicates()
-    wins_country['n_wins'].unique()
+    wins_country = wins_country.merge(country_points_metadata, on='country')
 
     # define a pointer selection
     click_state = alt.selection_point(fields=["country"], toggle=False)
@@ -351,12 +362,13 @@ if selected == 'Geopolitics':
         alt.Chart(worldmap)
         .mark_geoshape()
         .transform_lookup(
-            lookup="properties.country", from_=alt.LookupData(wins_country, "country", ["country", "n_wins"])
+            lookup="properties.country", from_=alt.LookupData(wins_country, "country", ["country", "n_wins", 
+            "Total points given", "Total points received"])
         )
         .encode(
             color=alt.Color("n_wins:Q").scale(range=eurovision_cont_palette, reverse=True).title('Number of wins'),
             opacity=alt.condition(click_state, alt.value(1), alt.value(0.2)),
-            tooltip=["country:N", "n_wins:Q"],
+            tooltip=["country:N", "n_wins:Q", "Total points received:Q", "Total points given:Q"],
         )
         .project(
             type= 'mercator',
@@ -375,12 +387,13 @@ if selected == 'Geopolitics':
     # create a choropleth map for Australia
     choropleth_australia = (
         alt.Chart(worldmap_australia).mark_geoshape(
-        ).transform_lookup(
-            lookup="properties.country", from_=alt.LookupData(wins_country, "country", ["country", "n_wins"])
+        .transform_lookup(
+            lookup="properties.country", from_=alt.LookupData(wins_country, "country", ["country", "n_wins", 
+            "Total points given", "Total points received"])
         ).encode(
             color=alt.Color("n_wins:Q").scale(range=eurovision_cont_palette, reverse=True).title('Number of wins'),
             opacity=alt.condition(click_state, alt.value(1), alt.value(0.2)),
-            tooltip=["country:N", "n_wins:Q"],
+            tooltip=["country:N", "n_wins:Q", "Total points received:Q", "Total points given:Q"],
         ).project(
             type='mercator',
             scale= 100,                          # Magnify
@@ -553,10 +566,18 @@ if selected == 'Geopolitics':
     points_country = points_country.reset_index()
     points_country.columns = ['Country','Region', 'Avg_points']
 
+    # Calculate median points by region
+    median_points_by_region = points_country.groupby('Region')['Avg_points'].median().reset_index()
+    median_points_by_region = median_points_by_region.sort_values('Avg_points', ascending=False)
+
+    # Order regions by median points
+    region_order = median_points_by_region['Region'].tolist()
+
     boxplot = alt.Chart(points_country).mark_boxplot(ticks={'color':'white'}, size=50, color='white').encode(
-            x=alt.X("Region:N", axis=alt.Axis(labelAngle=-45)), 
+            x=alt.X("Region:N", sort=region_order, axis=alt.Axis(labelAngle=-45)), 
             y=alt.Y("Avg_points:Q").title('Average points received per country'), 
-            color = alt.Color("Region:N").scale(range=eurovision_palette).legend(None),
+            color = alt.Color("Region:N").scale(range=[eurovision_palette[1], eurovision_palette[2], eurovision_palette[0],
+                                                 eurovision_palette[4],eurovision_palette[5], eurovision_palette[3]]).legend(None),
         ).properties(
             width=400, 
             height=300,
