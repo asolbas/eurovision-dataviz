@@ -805,8 +805,8 @@ if selected == 'Music':
             )
         ),
         showlegend=False,
-        width=750,
-        height=750,
+        width=500,
+        height=500,
         font=dict(
             size=18  # Aumentar tamaño de fuente general
         )
@@ -858,14 +858,14 @@ if selected == 'Music':
     #cloudtext is going to be imported from .txt since NLTK package
     #is not working properly in Streamlit Cloud.
     #Thus, all the preprocessing was done locally and save as .txt
-    with open("wordcloud.txt", 'r') as file:
+    with open("./Data/wordcloud.txt", 'r',  encoding="utf8") as file:
         cloudtext = file.read().rstrip()
     #cloudtext=full_cleaning(contestants_filt_df[['lyrics']],col='lyrics')
     wordcloud = WordCloud(max_font_size=50, max_words=maximum, background_color="black",collocations=False
         ).generate(cloudtext)
     #wordcloud.generate_from_frequencies
     plt.style.use("seaborn-white")
-    fig, ax = plt.subplots(figsize=())
+    fig, ax = plt.subplots(figsize=(10,10))
     ax.imshow(wordcloud.recolor(color_func=color_wordcloud), interpolation="bilinear")
     ax.axis("off")
 
