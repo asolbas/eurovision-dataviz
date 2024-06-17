@@ -2,6 +2,7 @@ import streamlit as st
 from streamlit_option_menu import option_menu
 
 # Download NLTK resources
+import nltk
 nltk.download('punkt')
 nltk.download('stopwords')
 nltk.download('words')
@@ -25,7 +26,6 @@ import nx_altair as nxa
 #Packages for plotting a wordcloud
 from ipywidgets import widgets, interact, interactive, fixed, Button, Layout
 from wordcloud import WordCloud, STOPWORDS, ImageColorGenerator
-import nltk
 from nltk.corpus import stopwords
 from IPython.display import display
 from nltk.tokenize import word_tokenize
