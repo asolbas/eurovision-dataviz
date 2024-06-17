@@ -19,10 +19,10 @@ import nx_altair as nxa
 #Packages for plotting a wordcloud
 from ipywidgets import widgets, interact, interactive, fixed, Button, Layout
 from wordcloud import WordCloud, STOPWORDS, ImageColorGenerator
-#import spacy
 import nltk
 from nltk.corpus import stopwords
 from IPython.display import display
+
 # Download NLTK resources
 nltk.download('punkt')
 nltk.download('stopwords')
@@ -69,21 +69,17 @@ with st.sidebar:
     contestants_df.loc[contestants_df['to_country']=='Serbia & Montenegro','to_country'] = 'Serbia and Montenegro'
     #Set points_final to 0 if country did not qualify
     contestants_df['points_final'].fillna(0, inplace=True)
+    #Drop 2020
+    contestants_df = contestants_df[contestants_df['year']!=2020]
     #Add song language
     results_df = pd.read_csv('./Data/Every_Eurovision_Result_Ever.csv')
-    results_df['Song'] = results_df['Song'].str.title()
+    results_df['Song'] = results_df['Song'].str.title() #Capitalize each song title 
     contestants_df = contestants_df.merge(results_df[['Country', 'Year', 'Language', 'Song']], left_on=['year', 'to_country', 'song'],
                                         right_on=['Year', 'Country', 'Song'], how='left')
     #Add column to determine if a contestant classified for the final
     contestants_df['finalist'] = 'No'
     contestants_df.loc[~contestants_df['place_final'].isna(), 'finalist'] = 'Yes'
     contestants_df['country'] = contestants_df['to_country']
-
-    #Drop 2020
-    contestants_df = contestants_df[contestants_df['year']!=2020]
-
-
-
     #Create a classification group based on their position in the grand final
     def classification_group(final_position):
         if final_position == 1:
@@ -98,26 +94,42 @@ with st.sidebar:
             classification = 'Finalist'
         return classification 
     contestants_df['classification'] = contestants_df['place_final'].apply(classification_group)
+    #Standarize country code
+    country_df = pd.read_csv('./Data/countries.csv')
+    country_df = country_df.rename(columns={'country':'country_id'})
+    country_df.loc[country_df['country_name']=='Bosnia & Herzegovina','country_name'] = 'Bosnia and Herzegovina'
+    country_df.loc[country_df['country_name']=='Serbia & Montenegro','country_name'] = 'Serbia and Montenegro'
+    country_df.loc[country_df['country_name']=='Czechia','country_name'] = 'Czech Republic'
+    contestants_df = pd.merge(contestants_df, country_df[['country_id','country_name']], left_on='to_country',
+                     right_on='country_name', how='left')
+    contestants_df = contestants_df.drop(columns=['to_country_id','country_name']).rename(columns={'country_id': 'to_country_id'})
 
     #Votes ------------------------
     country_votes_df = pd.read_csv('./Data/votes.csv')
-    # Import country-geographical group mapping
-    with open('./Data/country_groups_mapping.json', 'r') as file:
-        country_group_mapping = json.load(file)
-
+    #Transform IDs to upper case
+    country_votes_df['from_country_id'] = country_votes_df['from_country_id'].str.upper()
+    country_votes_df['to_country_id'] = country_votes_df['to_country_id'].str.upper()
+    #Get country name associated with ID
+    country_votes_df = pd.merge(country_votes_df, country_df[['country_id','country_name']], left_on='from_country_id',
+                        right_on='country_id', how='left').drop(['country_id','from_country'], axis=1).rename(
+                            columns={'country_name': 'from_country'})
+    country_votes_df = pd.merge(country_votes_df, country_df[['country_id','country_name']], left_on='to_country_id',
+                        right_on='country_id', how='left').drop(['country_id','to_country'], axis=1).rename(
+                            columns={'country_name': 'to_country'})
+    #Select relevant variables/instances
+    country_votes_df = country_votes_df[country_votes_df['from_country_id']!='WLD']
+    country_votes_df = country_votes_df[country_votes_df['year']!=2020]
+    country_votes_df.drop(['tele_points', 'jury_points'], axis=1, inplace=True)
     # Add geographical group 
-    country_votes_df['from_country_group'] = country_votes_df['from_country'].replace(country_group_mapping)
-    country_votes_df['to_country_group'] = country_votes_df['to_country'].replace(country_group_mapping)
+    country_group_mapping = dict(zip(country_df['country_id'], country_df['region']))
+    country_votes_df['from_country_group'] = country_votes_df['from_country_id'].replace(country_group_mapping)
+    country_votes_df['to_country_group'] = country_votes_df['to_country_id'].replace(country_group_mapping)
 
     #Calculate pertentage of points given and received
-    country_votes_filter_df = country_votes_df[country_votes_df['round']=='final'][['year', 'from_country', 'to_country', 'total_points']].dropna()
-    country_votes_filter_df = country_votes_filter_df.groupby(['from_country', 'to_country'], as_index=False)['total_points'].sum()
-    country_votes_filter_df = country_votes_filter_df.merge(contestants_df[['to_country_id', 'to_country']].drop_duplicates(), how='left',
-                                                            left_on='from_country', right_on='to_country_id').drop('to_country_id',axis=1)
-    country_votes_filter_df.columns = ['from_country', 'to_country', 'total_points', 'from_country_name']
-    country_votes_filter_df = country_votes_filter_df.merge(contestants_df[['to_country_id', 'to_country']].drop_duplicates(), how='left',
-                                                            left_on='to_country', right_on='to_country_id').drop('to_country_id',axis=1)
-    country_votes_filter_df.columns = ['from_country', 'to_country', 'total_points', 'from_country_name', 'to_country_name']
+    country_votes_filter_df = country_votes_df[country_votes_df['round']=='final'][['year', 'from_country_id', 'to_country_id', 'from_country', 
+                                                                                    'to_country', 'total_points']].dropna()
+    country_votes_filter_df = country_votes_filter_df.groupby(['from_country', 'to_country', 'from_country_id', 'to_country_id' ], as_index=False)['total_points'].sum()
+
     country_votes_filter_df.dropna(inplace=True)
     #Calculate percentage points a country has given to other countries trough its history
     country_total_points = country_votes_filter_df.groupby('from_country',as_index=False)['total_points'].sum()
@@ -125,6 +137,7 @@ with st.sidebar:
     country_votes_filter_df = country_votes_filter_df.merge(country_total_points)
     country_votes_filter_df['norm_points_from'] = country_votes_filter_df['total_points'] / country_votes_filter_df['overall_points_from']
     country_votes_filter_df['pct_points_from'] = country_votes_filter_df['norm_points_from'] * 100
+
     #Calculate percentage points a country has receiven by others trough its history
     country_total_points = country_votes_filter_df.groupby('to_country',as_index=False)['total_points'].sum()
     country_total_points.columns = ['to_country', 'overall_points_to']
@@ -133,25 +146,32 @@ with st.sidebar:
     country_votes_filter_df['pct_points_to'] = country_votes_filter_df['norm_points_to'] * 100
 
     #Total number of points received/given historically (metadata)
-    from_metadata = country_votes_filter_df[['from_country','from_country_name', 'overall_points_from']].drop_duplicates()
-    to_metadata = country_votes_filter_df[['to_country','to_country_name', 'overall_points_to']].drop_duplicates()
+    from_metadata = country_votes_filter_df[['from_country','from_country_id','overall_points_from']].drop_duplicates()
+    to_metadata = country_votes_filter_df[['to_country','to_country_id', 'overall_points_to']].drop_duplicates()
     country_points_metadata = from_metadata.merge(to_metadata, how='left', 
-        left_on=['from_country','from_country_name'], right_on=['to_country','to_country_name']).drop(
-            ['to_country_name', 'to_country'], axis=1)
+        left_on=['from_country', 'from_country_id'], right_on=['to_country','to_country_id',]).drop(['to_country_id','to_country'], axis=1)
     country_points_metadata.fillna(0, inplace=True) 
-    country_points_metadata.columns = ['country_id','country','Total points given', 'Total points received']
+    country_points_metadata.columns = ['country','country_id','Total points given', 'Total points received']
     country_points_metadata[['Total points given', 'Total points received']] = country_points_metadata[
         ['Total points given', 'Total points received']].astype('int')
 
     #Songs ----------------------
     songs_df = pd.read_csv('./Data/song_data.csv', na_values=['-', 'unknown'])
+    #Drop 2020 data
     songs_df = songs_df[songs_df['year']!=2020]
-
+    #Select relevant variables
+    col_sel = ['year', 'country', 'final_draw_position', 'energy', 'danceability', 'happiness', 'acousticness', 
+                                'liveness', 'speechiness', 'gender', 'style', 'backing_dancers', 'backing_singers', 'backing_instruments']
+    songs_df = songs_df[col_sel]
     #Create a classification column to group songs according to their position
     songs_df['classification'] = songs_df['final_draw_position'].apply(classification_group)
+    songs_df.drop('final_draw_position',axis=1, inplace=True)
 
     #Betting scores ----------------
     bets_df = pd.read_csv('./Data/betting_offices.csv')
+    #Get country IDs
+    bets_df = pd.merge(bets_df, country_df[['country_id','country_name']], on='country_name',how='left').drop(
+        ['country_code'], axis=1).rename(columns={'country_id': 'country_code'})
     #Drop 2020 data
     bets_df = bets_df[bets_df['year']!=2020]
     #Find missing country names and codes
@@ -159,10 +179,15 @@ with st.sidebar:
         ], on=['year', 'song']).set_index(bets_df[bets_df['country_name'].isnull()].isnull().index)
     bets_df['country_name'].fillna(aux_df['to_country'], inplace=True)
     bets_df['country_code'].fillna(aux_df['to_country_id'], inplace=True)
+    #Drop entries with missing betting scores
+    bets_df.dropna(inplace=True)
+    #Select relevant variables
+    col_sel = ['year', 'country_name', 'country_code', 'song', 'performer', 'contest_round', 'betting_name', 'betting_score']
+    bets_df = bets_df[col_sel]    
 
 #EUROVISION IN A NUTSHELL-----------------------
 if selected == 'Overview':
-    st.title('Eurovision in a Nutshell')
+    st.title('Eurovision in a Nutshell (1956-2023)')
 
     #General information about the contest --------
     kpi1, kpi2, kpi3, kpi4 = st.columns(4)
@@ -231,7 +256,13 @@ if selected == 'Overview':
         ).properties(
             width=600,
             height=300
-        )
+        ).configure_axis(
+            labelFontSize=16,
+            titleFontSize=16
+        ).configure_legend(
+        titleFontSize=15,
+        labelFontSize=15        
+        ) 
 
     col1.subheader('Evolution of the contest')
     col1.altair_chart(points_plot, use_container_width=True, theme=None)
@@ -257,28 +288,37 @@ if selected == 'Overview':
 
     #Plot languages
     languages_plot =  alt.Chart(contestants_language_df).mark_area().encode(
-                x=alt.X("year:T", axis=alt.Axis(format='%Y')).title('Year'),
+                x=alt.X("Year:T", axis=alt.Axis(format='%Y')).title('Year'),
                 y=alt.Y('size:Q').title('Number of entries'),
                 color=alt.Color("Language_red:N", scale=alt.Scale(range=eurovision_palette)
                 ).title('Language'),
                 tooltip=[alt.Tooltip('year:Q', title='Year'), alt.Tooltip('Language_red:N', title='Language'),
             alt.Tooltip('size:Q', title='Number of songs')]).properties(
-                    width=600,
-                    height=300
-            )
+                    width=500,
+                    height=325
+            ).configure_axis(
+            labelFontSize=16,
+            titleFontSize=16
+        ).configure_legend(
+        titleFontSize=15,
+        labelFontSize=15        
+        ) 
     col1.subheader('Evolution of the songs languages')
     col1.altair_chart(languages_plot, use_container_width=True, theme=None)
 
 
     # Trayectoria de cada país en el concurso ------------------------
+    contestants_traj_df = contestants_df.copy()
+    contestants_traj_df['year'] = pd.to_datetime(contestants_traj_df['year'], format='%Y')
     click_state = alt.selection_point(fields=['country'])
+    color_scale = alt.Scale(domain=contestants_traj_df['country'].unique(), range=eurovision_palette)
     color = alt.condition(
         click_state,
-        alt.Color('country:N', scale=alt.Scale(range=eurovision_palette)).legend(None),
+        alt.Color('country:N', scale=color_scale).legend(None),
         alt.value('rgba(211, 211, 211, 0)')
     )
 
-    points_plot = alt.Chart(contestants_df).mark_line(point=True).encode(
+    points_plot = alt.Chart(contestants_traj_df).mark_line(point=True).encode(
         x=alt.X("year:T", axis=alt.Axis(format='%Y')).title('Years'),
         y=alt.Y('place_contest',scale=alt.Scale(domain=(45, 1))).title('Place in contest'),
         color=color,
@@ -287,13 +327,13 @@ if selected == 'Overview':
         alt.Tooltip('points_final:Q', title='Total points')]
     ).properties(
         width=500,
-        height=300
+        height=250
     )
 
-    legend = alt.Chart(contestants_df).mark_point().encode(
-        alt.Y('country:N', title='Country').axis(orient='right'),
+    legend = alt.Chart(contestants_traj_df).mark_point().encode(
+        alt.Y('country:N', title=None).axis(orient='right'),
         color=color
-    ).add_params(
+    ).transform_filter(
         click_state
     )
 
@@ -351,18 +391,21 @@ if selected == 'Overview':
     )
     )
 
-    trajectory_plot = (alt.layer(choropleth,choropleth_australia) & points_plot).add_params(click_state)
+    trajectory_plot = (alt.layer(choropleth,choropleth_australia) & points_plot | legend).configure_axis(
+            labelFontSize=16,
+            titleFontSize=16
+        ).configure_legend(
+        titleFontSize=15,
+        labelFontSize=15        
+        ).add_params(click_state)
 
     col2.subheader('Trajectory of each country')
+    col2.info('Click on one or multiple countries to study its trajectory in the contest.', icon="ℹ️")
     col2.altair_chart(trajectory_plot, use_container_width=False, theme=None)
 
 #GEOPOLITICS IN EUROVISION -----------------------
 if selected == 'Geopolitics':
-    st.title('Geopolitics in Eurovision')
-
-    #start_range, end_range = st.select_slider('Select a time range', 
-    #                           options = np.arange(1956,2024,1),
-    #                           value=(1956,2023))
+    st.title('Geopolitics in Eurovision (1956-2023)')
 
     #Plots
     col1, col2 = st.columns(2)
@@ -377,12 +420,12 @@ if selected == 'Geopolitics':
 
     # define a pointer selection
     click_state = alt.selection_point(fields=["country"], toggle=False)
-    #create map of europe
     europe_url = "https://raw.githubusercontent.com/asolbas/eurovision-dataviz/main/Data/europe_map.geojson"
     worldmap = alt.Data(url=europe_url, format=alt.DataFormat(property='features',type='json'))
     choropleth = (
         alt.Chart(worldmap)
-        .mark_geoshape().transform_lookup(
+        .mark_geoshape()
+        .transform_lookup(
             lookup="properties.country", from_=alt.LookupData(wins_country, "country", ["country", "n_wins", 
             "Total points given", "Total points received"])
         )
@@ -390,7 +433,7 @@ if selected == 'Geopolitics':
             color=alt.Color("n_wins:Q").scale(range=eurovision_cont_palette, reverse=True).title('Number of wins'),
             opacity=alt.condition(click_state, alt.value(1), alt.value(0.2)),
             tooltip=[alt.Tooltip('country:N', title='Country'), alt.Tooltip('n_wins:N', title='Number of wins'), 
-        "Total points received:Q", "Total points given:Q"],
+            "Total points received:Q", "Total points given:Q"],
         )
         .project(
             type= 'mercator',
@@ -410,13 +453,13 @@ if selected == 'Geopolitics':
     choropleth_australia = (
         alt.Chart(worldmap_australia).mark_geoshape(
         ).transform_lookup(
-            lookup="properties.country", from_=alt.LookupData(wins_country, "country", ["country", "n_wins", 
+            lookup="properties.country", from_=alt.LookupData(wins_country, "country", ["country", "n_wins",
             "Total points given", "Total points received"])
         ).encode(
             color=alt.Color("n_wins:Q").scale(range=eurovision_cont_palette, reverse=True).title('Number of wins'),
             opacity=alt.condition(click_state, alt.value(1), alt.value(0.2)),
             tooltip=[alt.Tooltip('country:N', title='Country'), alt.Tooltip('n_wins:N', title='Number of wins'), 
-        "Total points received:Q", "Total points given:Q"],
+            "Total points received:Q", "Total points given:Q"],
         ).project(
             type='mercator',
             scale= 100,                          # Magnify
@@ -430,13 +473,13 @@ if selected == 'Geopolitics':
 
     # create a bar chart with a ranking
     aux_df = country_votes_filter_df.copy()
-    aux_df['country'] = country_votes_filter_df['to_country_name']
+    aux_df['country'] = country_votes_filter_df['to_country']
     most_votes_from = (
         alt.Chart(
             aux_df).mark_bar(color = eurovision_palette[0]).encode(
             x=alt.X("pct_points_to").title('Points received (percentage)'),
-            y=alt.Y("from_country_name").title('Country').sort("-x"),
-            tooltip=[alt.Tooltip('from_country_name:N', title='From'), alt.Tooltip('country:N', title='To'), 
+            y=alt.Y("from_country").title('Country').sort("-x"),
+            tooltip=[alt.Tooltip('from_country:N', title='From'), alt.Tooltip('country:N', title='To'), 
             alt.Tooltip("pct_points_to:Q", title='Percentage of points', format='.2f')],
         ).transform_filter(
         click_state
@@ -445,20 +488,21 @@ if selected == 'Geopolitics':
         sort=[alt.SortField('pct_points_to', order='descending')]
     ).transform_filter(
         alt.datum.rank <= 5).properties(
-            width=150,
-            height=150,
+            width=100,
+            height=100,
             title="Most voted by"
         )
     )
 
+
     aux_df = country_votes_filter_df.copy()
-    aux_df['country'] = country_votes_filter_df['from_country_name']
+    aux_df['country'] = country_votes_filter_df['from_country']
     most_votes_to = (
         alt.Chart(
             aux_df).mark_bar(color = eurovision_palette[0]).encode(
             x=alt.X("pct_points_from").title('Points given (percentage)'),
-            y=alt.Y("to_country_name").title('Country').sort("-x"),
-            tooltip=[alt.Tooltip('country:N', title='From'), alt.Tooltip('to_country_name:N', title='To'), 
+            y=alt.Y("to_country").title('Country').sort("-x"),
+            tooltip=[alt.Tooltip('country:N', title='From'), alt.Tooltip('to_country:N', title='To'), 
             alt.Tooltip("pct_points_from:Q", title='Percentage of points', format='.2f')],
         ).transform_filter(
         click_state,
@@ -467,34 +511,47 @@ if selected == 'Geopolitics':
         sort=[alt.SortField('pct_points_from', order='descending')]
     ).transform_filter(
         alt.datum.rank <= 5).properties(
-            width=150,
-            height=150,
+            width=100,
+            height=100,
             title="Most votes to"
         )
     )
 
     popularity_plot = alt.vconcat(alt.layer(choropleth,choropleth_australia), 
                     alt.hconcat(most_votes_to, most_votes_from)
-                    ).add_params(click_state)
+                    ).add_params(click_state).configure_axis(
+            labelFontSize=16,
+            titleFontSize=16
+        ).configure_legend(
+        titleFontSize=15,
+        labelFontSize=15,
+        orient='top'        
+        )
     
     col1.subheader('Who is the most popular?')
+    col1.info('Click on one country to study its voting pattern.', icon="ℹ️")
     col1.altair_chart(popularity_plot, use_container_width=False, theme=None)
 
     #Friendzone plot ----------------------------
     col2.subheader('Friendzone graph')
+    col2.info('Each node represents a country whereas the edges represent the relationships between \
+              them on the basis of the percentage of point that a country has given to another. \
+              The edge width is proportional to this percentage', icon="ℹ️")
 
     #Percentage threshold 
     #Add an interactive bar to select percentage threshold
     th = col2.select_slider('**Select a percentage threshold**', 
                                options = np.arange(0,20.5,0.5),
                                value=6)
+
     votes_graph = nx.from_pandas_edgelist(country_votes_filter_df[country_votes_filter_df['pct_points_from']>th],
-                                        'from_country', 'to_country',
-                                        edge_attr=['pct_points_from','total_points'])
+                                        'from_country_id', 'to_country_id',
+                                        edge_attr=['pct_points_from','total_points'],
+                                        )
 
     #Create a dictionary mapping each country to its country_id
-    country_name_mapping = dict(zip(country_votes_filter_df['from_country'], country_votes_filter_df['from_country_name']))
-    country_id_mapping = dict(zip(country_votes_filter_df['from_country'], country_votes_filter_df['from_country']))
+    country_name_mapping = dict(zip(country_votes_filter_df['from_country_id'], country_votes_filter_df['from_country']))
+    country_id_mapping = dict(zip(country_votes_filter_df['from_country_id'], country_votes_filter_df['from_country']))
     country_points_to_mapping = dict(zip(country_points_metadata['country_id'], country_points_metadata['Total points received']))
     country_points_from_mapping = dict(zip(country_points_metadata['country_id'], country_points_metadata['Total points given']))
 
@@ -519,17 +576,19 @@ if selected == 'Geopolitics':
             width='pct_points_from',
             node_color = 'Region',
             cmap='set3',
+            edge_color='#E6E6FA', 
             node_tooltip=[alt.Tooltip('country_name:N', title='Country'), alt.Tooltip('Total points received:Q'),
-            alt.Tooltip('Total points given:Q')],
-            edge_color='#E6E6FA'
+            alt.Tooltip('Total points given:Q')]
         ).properties(
             width=600,
             height=400
         ).configure_view(
-            stroke=None  # Remove the stroke
-        ).configure_axis(
-            domain=False  # Remove all axes
-        ).interactive()
+                stroke=None  # Remove the stroke
+            ).configure_axis(
+                domain=False  # Remove all axes
+            ).interactive().configure_legend(
+            titleFontSize=15,
+            labelFontSize=15) 
     
     col2.altair_chart(geo_graph, use_container_width=True, theme=None)
 
@@ -550,20 +609,6 @@ if selected == 'Geopolitics':
             distance = np.nan
         return distance
 
-    #Calculate distance between countries
-    url = "https://raw.githubusercontent.com/asolbas/eurovision-dataviz/main/Data/world.geojson"
-    gdf_ne = gpd.read_file(url)  # zipped shapefile
-    gdf_ne = gdf_ne[["name", 'geometry', 'continent', 'type']]
-    gdf_ne.columns = ["country", 'geometry', 'continent', 'type']
-    country_votes_dist_df = country_votes_filter_df[country_votes_filter_df['from_country'] != country_votes_filter_df['to_country']]
-    country_votes_dist_df.loc[:,'distance'] = country_votes_dist_df.apply(lambda row: distance_btw_countries(row['from_country_name'], row['to_country_name']), axis=1)
-    country_votes_dist_df = country_votes_dist_df.dropna(subset=['distance'])
-
-    #Filter Australia
-    country_votes_dist_df = country_votes_dist_df[country_votes_dist_df['from_country_name']!='Australia']
-    country_votes_dist_df = country_votes_dist_df[country_votes_dist_df['to_country_name']!='Australia']
-
-    #Select country group
     region_color_map = {
         'Balcans': eurovision_palette[1],
         'Eastern Europe': eurovision_palette[2],
@@ -572,13 +617,28 @@ if selected == 'Geopolitics':
         'Northern Europe': eurovision_palette[5],
         'Western Europe': eurovision_palette[3]
     }
-    country_votes_dist_df['from_country_group'] = country_votes_dist_df['from_country'].replace(country_group_mapping)
+
+    #Calculate distance between countries
+    url = "https://raw.githubusercontent.com/asolbas/eurovision-dataviz/main/Data/world.geojson"
+    gdf_ne = gpd.read_file(url)  # zipped shapefile
+    gdf_ne = gdf_ne[["name", 'geometry', 'continent', 'type']]
+    gdf_ne.columns = ["country", 'geometry', 'continent', 'type']
+    country_votes_dist_df = country_votes_filter_df[country_votes_filter_df['from_country'] != country_votes_filter_df['to_country']]
+    country_votes_dist_df.loc[:,'distance'] = country_votes_dist_df.apply(lambda row: distance_btw_countries(row['from_country'], row['to_country']), axis=1)
+    country_votes_dist_df = country_votes_dist_df.dropna(subset=['distance'])
+
+    #Filter Australia
+    country_votes_dist_df = country_votes_dist_df[country_votes_dist_df['from_country']!='Australia']
+    country_votes_dist_df = country_votes_dist_df[country_votes_dist_df['to_country']!='Australia']
+
+    #Select country group
+    country_votes_dist_df['from_country_group'] = country_votes_dist_df['from_country_id'].replace(country_group_mapping)
     country_votes_dist_df = country_votes_dist_df.rename(columns={'from_country_group':'Region'})
     selection = alt.selection_point(fields=['Region'], empty=True)
     color = alt.condition(
         selection,
         alt.Color('Region:N', scale=alt.Scale(domain=list(region_color_map.keys()),
-            range=list(region_color_map.values()))).legend(None),
+                range=list(region_color_map.values()))).legend(None),
         alt.value('rgba(211, 211, 211, 0)')
     )
 
@@ -587,27 +647,31 @@ if selected == 'Geopolitics':
             x=alt.X('distance:Q').title('Distance (degrees)'),
             y=alt.Y('pct_points_from:Q').title('Percentage of points given'),
             color = color,
-            tooltip=[alt.Tooltip('from_country_name:N', title='From'), alt.Tooltip('to_country_name:N', title='To'), 
-                alt.Tooltip('pct_points_from:Q', title='Percentage of points', format='.2f'), 
-                alt.Tooltip('distance:Q', title='Distance', format='.2f')]
+            tooltip=[alt.Tooltip('from_country:N', title='From'), alt.Tooltip('to_country:N', title='To'), 
+            alt.Tooltip('pct_points_from:Q', title='Percentage of points', format='.2f'), 
+            alt.Tooltip('distance:Q', title='Distance', format='.2f')]
     ).properties(
-                width=800,
-                height=300,
-                title='Do neighbors vote each other?'
-        )
-    reg_line = distance_plot.transform_regression('distance', 'pct_points_from').mark_line(
-    color='white', size=5)
+                width=500,
+                height=250,
+                title=alt.TitleParams(
+            text='Do neighbors vote each other?',
+            fontSize=20  # Increase title font size
+        ))
 
     legend = alt.Chart(country_votes_dist_df).mark_point().encode(
-        alt.Y('Region:N', title='Region').axis(orient='right'),
+        alt.Y('Region:N', title='Geographical region').axis(orient='right'),
         color=color
     ).add_params(
         selection
     )
 
+    reg_line = distance_plot.transform_regression('distance', 'pct_points_from').mark_line(
+        color='white', size=5)
+
     #Average points recieved by country
-    points_country = (country_votes_df.groupby(['to_country', 'to_country_group'])['total_points'].sum() / country_votes_df.groupby(
-        ['to_country', 'to_country_group']).size()).sort_values(ascending=False)
+    country_votes_scaled = country_votes_df.copy()
+    country_votes_scaled.loc[country_votes_scaled['year'] >= 2015, 'total_points'] /= 2
+    points_country = country_votes_scaled.groupby(['to_country', 'to_country_group'])['total_points'].mean().sort_values(ascending=False)
     points_country = points_country.reset_index()
     points_country.columns = ['Country','Region', 'Avg_points']
 
@@ -626,16 +690,69 @@ if selected == 'Geopolitics':
         ).properties(
             width=400, 
             height=300,
-            title='Who is the most popular?'
-
+            title=alt.TitleParams(
+            text='Popularity ranking (regions)',
+            fontSize=20  # Increase title font size
+        )
         )
 
-    st.info('Australia is not displayed in the distance plot for being the only country that is not part of Eurasia.', icon="ℹ️")
-    st.altair_chart(boxplot | distance_plot + reg_line| legend,  theme=None, use_container_width=True)
+    #Country ranking
+    selection = alt.selection_point(fields=['Region'], bind='legend')
+    country_ranking = alt.Chart(points_country).mark_bar().encode(
+        x=alt.X("Country:N", sort='-y', axis=alt.Axis(labelAngle=-45)), 
+        y=alt.Y("Avg_points:Q", scale=alt.Scale(domain=[0, 7])).title('Average points received per country'), 
+        color=alt.Color("Region:N", scale=alt.Scale(domain=list(region_color_map.keys()),
+                range=list(region_color_map.values()))).title('Region')
+    ).add_params(
+        selection
+    ).transform_filter(
+        selection
+    ).transform_window(
+        rank='rank(Avg_points)',
+        sort=[alt.SortField('Avg_points', order='descending')]
+    ).transform_filter(
+    alt.datum.rank <= 15
+    ).properties(
+        width=400,
+        height=250,
+        title=alt.TitleParams(
+            text='Popularity ranking (countries)',
+            fontSize=20  # Increase title font size
+        )
+    )
+
+    ranking_selector = st.radio(
+        "Select the level of detail",
+        ["Regions", "Countries"],
+        horizontal=True)
+
+    if ranking_selector == "Regions":
+        st.info('Australia is not displayed in the distance plot for being the only country that is not part of Eurasia.', icon="ℹ️")
+        st.altair_chart((boxplot | distance_plot + reg_line| legend).resolve_scale(
+            color='independent'
+        ).configure_axis(
+            labelFontSize=16,
+            titleFontSize=16
+        ).configure_legend(
+        titleFontSize=15,
+        labelFontSize=15, 
+        orient='bottom'),  theme=None, use_container_width=True)
+    else:
+        st.info('Australia is not displayed in the distance plot for being the only country that is not part of Eurasia.', icon="ℹ️")
+        st.altair_chart((country_ranking | distance_plot + reg_line| legend).resolve_scale(
+            color='independent'
+        ).configure_axis(
+            labelFontSize=16,
+            titleFontSize=16
+        ).configure_legend(
+        titleFontSize=15,
+        labelFontSize=15, 
+        orient='right'),  theme=None, use_container_width=True)
+
 
 #WHAT MAKES A SONG SO GOOD-----------------------
 if selected == 'Music':
-    st.title('What makes a song SO good?')
+    st.title('What makes a song SO good? (2009-2023)')
 
     group_selection = st.selectbox("Select classification group", 
                                    options=['All', 'Winner', 'Top5', 'Top10', 
@@ -677,14 +794,22 @@ if selected == 'Music':
                     template = 'plotly_dark', color_discrete_sequence = eurovision_palette)
     fig.update_traces(fill='toself')
     fig.update_layout(
-    polar=dict(
-        radialaxis=dict(
-        visible=True,
-        range=[0, 80]
-        )),
-    showlegend=False,
-    width=600,
-    height=400
+        polar=dict(
+            radialaxis=dict(
+                visible=True,
+                range=[0, 80],
+                tickfont=dict(size=15)  # Aumentar tamaño de fuente del título del eje radial
+            ),
+            angularaxis=dict(
+                tickfont=dict(size=15)  # Aumentar tamaño de fuente del título del eje angular
+            )
+        ),
+        showlegend=False,
+        width=600,
+        height=600,
+        font=dict(
+            size=18  # Aumentar tamaño de fuente general
+        )
     )
 
     col1.plotly_chart(fig, use_container_width=True, theme=None)
@@ -736,7 +861,7 @@ if selected == 'Music':
         ).generate(cloudtext)
     #wordcloud.generate_from_frequencies
     plt.style.use("seaborn-white")
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(10, 10))
     ax.imshow(wordcloud.recolor(color_func=color_wordcloud), interpolation="bilinear")
     ax.axis("off")
 
@@ -778,8 +903,14 @@ if selected == 'Music':
         ).properties(
                 width=600,
                 height=400,
-            title='Main singer(s) gender'
-        )
+            title='Singer(s) gender'
+            ).configure_axis(
+            labelFontSize=20,
+            titleFontSize=20
+        ).configure_legend(
+        titleFontSize=15,
+        labelFontSize=15
+        ).configure_title(fontSize=20) 
     #Music style
     counts_df = songs_filt_df.groupby('style').size().sort_values().reset_index()
     counts_df.columns = [counts_df.columns[0], 'count']
@@ -795,7 +926,13 @@ if selected == 'Music':
                 width=600,
                 height=400,
             title='Music style'
-        )
+        ).configure_axis(
+            labelFontSize=20,
+            titleFontSize=20
+        ).configure_legend(
+        titleFontSize=15,
+        labelFontSize=15
+        ).configure_title(fontSize=20) 
         
     #Dancers
     counts_df = songs_filt_df.groupby('backing_dancers').size().sort_values().reset_index()
@@ -811,7 +948,13 @@ if selected == 'Music':
                 width=500,
                 height=400,
                 title='Backing dancers'
-            )
+            ).configure_axis(
+            labelFontSize=20,
+            titleFontSize=20
+        ).configure_legend(
+        titleFontSize=15,
+        labelFontSize=15
+        ).configure_title(fontSize=20) 
     
     #Singers
     counts_df = songs_filt_df.groupby('backing_singers').size().sort_values().reset_index()
@@ -827,7 +970,13 @@ if selected == 'Music':
                 width=500,
                 height=400,
                 title='Backing singers'
-            )
+            ).configure_axis(
+            labelFontSize=20,
+            titleFontSize=20
+        ).configure_legend(
+        titleFontSize=15,
+        labelFontSize=15
+        ).configure_title(fontSize=20) 
     
     #Instruments
     counts_df = songs_filt_df.groupby('backing_instruments').size().sort_values().reset_index()
@@ -843,7 +992,13 @@ if selected == 'Music':
                 width=500,
                 height=400,
                 title='Backing instruments'
-            )
+            ).configure_axis(
+            labelFontSize=20,
+            titleFontSize=20
+        ).configure_legend(
+        titleFontSize=15,
+        labelFontSize=15
+        ).configure_title(fontSize=20) 
     col1.altair_chart(gender_plot, use_container_width=True, theme=None)
     col2.altair_chart(style_plot, use_container_width=True, theme=None)
     col3.altair_chart(singers_plot, use_container_width=True, theme=None)
@@ -892,7 +1047,13 @@ if selected == 'Voting':
         selection
     ).transform_filter(
         selection
-    )
+    ).configure_axis(
+            labelFontSize=16,
+            titleFontSize=16
+        ).configure_legend(
+        titleFontSize=15,
+        labelFontSize=15,
+        )
     # Show the plot
     col1.header('Betting houses predictive power')
     col1.altair_chart(scatter_plot, use_container_width=True, theme=None) 
@@ -923,6 +1084,12 @@ if selected == 'Voting':
             spacing=0
         ).configure_view(
             stroke=None
+        ).configure_axis(
+            labelFontSize=16,
+            titleFontSize=16
+        ).configure_legend(
+        titleFontSize=15,
+        labelFontSize=15,
         )
     # Show the plot
     col2.header('Running order effect on votes')
@@ -986,5 +1153,11 @@ if selected == 'Voting':
     )
 
     st.header('Do Jury and Televote agree?')
-    st.altair_chart(alt.hconcat(jury_vs_tele,  ranking_jury | ranking_tele).resolve_legend(color='independent')
+    st.altair_chart(alt.hconcat(jury_vs_tele,  ranking_jury | ranking_tele).resolve_legend(color='independent').configure_axis(
+    labelFontSize=20,
+    titleFontSize=20
+    ).configure_legend(
+    titleFontSize=15,
+    labelFontSize=15
+    ).configure_title(fontSize=24)  
         , use_container_width=True, theme=None) 
