@@ -1,6 +1,12 @@
 import streamlit as st
 from streamlit_option_menu import option_menu
 
+# Download NLTK resources
+nltk.download('punkt')
+nltk.download('stopwords')
+nltk.download('words')
+nltk.download('wordnet')
+
 import os
 import math
 import numpy as np
@@ -22,12 +28,6 @@ from wordcloud import WordCloud, STOPWORDS, ImageColorGenerator
 import nltk
 from nltk.corpus import stopwords
 from IPython.display import display
-
-# Download NLTK resources
-#nltk.download('punkt')
-nltk.download('stopwords')
-nltk.download('words')
-nltk.download('wordnet')
 from nltk.tokenize import word_tokenize
 
 #PAGE LAYOUT
@@ -805,8 +805,8 @@ if selected == 'Music':
             )
         ),
         showlegend=False,
-        width=600,
-        height=600,
+        width=750,
+        height=750,
         font=dict(
             size=18  # Aumentar tamaño de fuente general
         )
@@ -857,11 +857,11 @@ if selected == 'Music':
 
     cloudtext=full_cleaning(contestants_filt_df[['lyrics']],col='lyrics')
     wordcloud = WordCloud(max_font_size=50, max_words=maximum, background_color="black",collocations=False, 
-        #font_path='calibri.ttf'
+        font_path='calibri.ttf'
         ).generate(cloudtext)
     #wordcloud.generate_from_frequencies
     plt.style.use("seaborn-white")
-    fig, ax = plt.subplots(figsize=(10, 10))
+    fig, ax = plt.subplots(figsize=())
     ax.imshow(wordcloud.recolor(color_func=color_wordcloud), interpolation="bilinear")
     ax.axis("off")
 
@@ -903,14 +903,14 @@ if selected == 'Music':
         ).properties(
                 width=600,
                 height=400,
-            title='Singer(s) gender'
+            title='Main singer(s) gender'
             ).configure_axis(
             labelFontSize=20,
             titleFontSize=20
         ).configure_legend(
         titleFontSize=15,
         labelFontSize=15
-        ).configure_title(fontSize=20) 
+        ).configure_title(fontSize=24) 
     #Music style
     counts_df = songs_filt_df.groupby('style').size().sort_values().reset_index()
     counts_df.columns = [counts_df.columns[0], 'count']
@@ -932,7 +932,7 @@ if selected == 'Music':
         ).configure_legend(
         titleFontSize=15,
         labelFontSize=15
-        ).configure_title(fontSize=20) 
+        ).configure_title(fontSize=24) 
         
     #Dancers
     counts_df = songs_filt_df.groupby('backing_dancers').size().sort_values().reset_index()
@@ -954,7 +954,7 @@ if selected == 'Music':
         ).configure_legend(
         titleFontSize=15,
         labelFontSize=15
-        ).configure_title(fontSize=20) 
+        ).configure_title(fontSize=24) 
     
     #Singers
     counts_df = songs_filt_df.groupby('backing_singers').size().sort_values().reset_index()
@@ -976,7 +976,7 @@ if selected == 'Music':
         ).configure_legend(
         titleFontSize=15,
         labelFontSize=15
-        ).configure_title(fontSize=20) 
+        ).configure_title(fontSize=24) 
     
     #Instruments
     counts_df = songs_filt_df.groupby('backing_instruments').size().sort_values().reset_index()
@@ -998,7 +998,7 @@ if selected == 'Music':
         ).configure_legend(
         titleFontSize=15,
         labelFontSize=15
-        ).configure_title(fontSize=20) 
+        ).configure_title(fontSize=24) 
     col1.altair_chart(gender_plot, use_container_width=True, theme=None)
     col2.altair_chart(style_plot, use_container_width=True, theme=None)
     col3.altair_chart(singers_plot, use_container_width=True, theme=None)
@@ -1153,11 +1153,5 @@ if selected == 'Voting':
     )
 
     st.header('Do Jury and Televote agree?')
-    st.altair_chart(alt.hconcat(jury_vs_tele,  ranking_jury | ranking_tele).resolve_legend(color='independent').configure_axis(
-    labelFontSize=20,
-    titleFontSize=20
-    ).configure_legend(
-    titleFontSize=15,
-    labelFontSize=15
-    ).configure_title(fontSize=24)  
+    st.altair_chart(alt.hconcat(jury_vs_tele,  ranking_jury | ranking_tele).resolve_legend(color='independent')
         , use_container_width=True, theme=None) 
