@@ -335,6 +335,8 @@ if selected == 'Overview':
         color=color
     ).transform_filter(
         click_state
+    ).properties(
+        height=750
     )
 
 
