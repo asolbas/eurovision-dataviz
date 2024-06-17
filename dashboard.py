@@ -855,9 +855,13 @@ if selected == 'Music':
         random_color = np.random.choice(eurovision_palette[:-4])
         return random_color
 
-    cloudtext=full_cleaning(contestants_filt_df[['lyrics']],col='lyrics')
-    wordcloud = WordCloud(max_font_size=50, max_words=maximum, background_color="black",collocations=False, 
-        font_path='calibri.ttf'
+    #cloudtext is going to be imported from .txt since NLTK package
+    #is not working properly in Streamlit Cloud.
+    #Thus, all the preprocessing was done locally and save as .txt
+    with open("wordcloud.txt", 'r') as file:
+        cloudtext = file.read().rstrip()
+    #cloudtext=full_cleaning(contestants_filt_df[['lyrics']],col='lyrics')
+    wordcloud = WordCloud(max_font_size=50, max_words=maximum, background_color="black",collocations=False
         ).generate(cloudtext)
     #wordcloud.generate_from_frequencies
     plt.style.use("seaborn-white")
