@@ -24,7 +24,7 @@ from nltk.corpus import stopwords
 from IPython.display import display
 
 # Download NLTK resources
-nltk.download('punkt')
+#nltk.download('punkt')
 nltk.download('stopwords')
 nltk.download('words')
 nltk.download('wordnet')

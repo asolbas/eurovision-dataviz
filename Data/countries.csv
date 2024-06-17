@@ -1,0 +1,53 @@
+country,country_name,region
+AL,Albania,Balcans
+AD,Andorra,Mediterranean
+AM,Armenia,Middle East-Caucasus
+AU,Australia,Western Europe
+AT,Austria,Western Europe
+AZ,Azerbaijan,Middle East-Caucasus
+BY,Belarus,Eastern Europe
+BE,Belgium,Western Europe
+BA,Bosnia & Herzegovina,Balcans
+BG,Bulgaria,Balcans
+HR,Croatia,Balcans
+CY,Cyprus,Balcans
+CZ,Czechia,Eastern Europe
+DK,Denmark,Northern Europe
+EE,Estonia,Eastern Europe
+FI,Finland,Northern Europe
+FR,France,Western Europe
+GE,Georgia,Middle East-Caucasus
+DE,Germany,Western Europe
+GR,Greece,Balcans
+HU,Hungary,Eastern Europe
+IS,Iceland,Northern Europe
+IE,Ireland,Western Europe
+IL,Israel,Middle East-Caucasus
+IT,Italy,Mediterranean
+LV,Latvia,Eastern Europe
+LT,Lithuania,Eastern Europe
+LU,Luxembourg,Western Europe
+MT,Malta,Mediterranean
+MD,Moldova,Eastern Europe
+MC,Monaco,Mediterranean
+ME,Montenegro,Balcans
+MA,Morocco,Mediterranean
+NL,Netherlands,Western Europe
+MK,North Macedonia,Balcans
+NO,Norway,Northern Europe
+PL,Poland,Eastern Europe
+PT,Portugal,Mediterranean
+RO,Romania,Eastern Europe
+RU,Russia,Eastern Europe
+SM,San Marino,Mediterranean
+RS,Serbia,Balcans
+CS,Serbia and Montenegro,Balcans
+SK,Slovakia,Eastern Europe
+SI,Slovenia,Balcans
+ES,Spain,Mediterranean
+SE,Sweden,Northern Europe
+CH,Switzerland,Western Europe
+TR,Turkey,Middle East-Caucasus
+UA,Ukraine,Eastern Europe
+GB,United Kingdom,Western Europe
+YU,Yugoslavia,Balcans
