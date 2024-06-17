@@ -391,7 +391,7 @@ if selected == 'Overview':
     )
     )
 
-    trajectory_plot = (alt.layer(choropleth,choropleth_australia) & points_plot | legend).configure_axis(
+    trajectory_plot = (alt.hconcat(alt.vconcat(alt.layer(choropleth,choropleth_australia), points_plot), legend)).configure_axis(
             labelFontSize=16,
             titleFontSize=16
         ).configure_legend(
